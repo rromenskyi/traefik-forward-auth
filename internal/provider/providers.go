@@ -36,7 +36,9 @@ type User struct {
 type OAuthProvider struct {
 	Resource string `long:"resource" env:"RESOURCE" description:"Optional resource indicator"`
 
-	Config *oauth2.Config
+	// Never serialised: it carries the client secret, and the config is
+	// logged at debug level on startup.
+	Config *oauth2.Config `json:"-"`
 	ctx    context.Context
 }
 
