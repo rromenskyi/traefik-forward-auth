@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
 
 /**
@@ -408,4 +409,27 @@ func TestConfigCommaSeparatedList(t *testing.T) {
 	marshal, err := list.MarshalFlag()
 	assert.Nil(err)
 	assert.Equal("one,two", marshal, "should marshal back to comma sepearated list")
+}
+
+func TestConfigStringRedactsSecrets(t *testing.T) {
+	c, err := NewConfig([]string{
+		"--secret=signing-secret-value",
+		"--providers.oidc.client-id=id",
+		"--providers.oidc.client-secret=oidc-client-secret-value",
+		"--providers.generic-oauth.auth-url=https://idp.example/auth",
+		"--providers.generic-oauth.token-url=https://idp.example/token",
+		"--providers.generic-oauth.user-url=https://idp.example/user",
+		"--providers.generic-oauth.client-id=id",
+		"--providers.generic-oauth.client-secret=generic-client-secret-value",
+	})
+	require.Nil(t, err)
+	// Setup copies the client secret into the embedded oauth2.Config, which
+	// is what the startup log line used to print.
+	require.Nil(t, c.Providers.GenericOAuth.Setup())
+	c.Providers.OIDC.Config = &oauth2.Config{ClientSecret: c.Providers.OIDC.ClientSecret}
+
+	out := c.String()
+	for _, s := range []string{"signing-secret-value", "oidc-client-secret-value", "generic-client-secret-value"} {
+		assert.NotContains(t, out, s)
+	}
 }
